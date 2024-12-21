@@ -1,58 +1,74 @@
 ![Alt text](/Deploy-a-WordPress-Website-on-AWS.png)
 
 
----
-
 # Hosting a WordPress Website on AWS
 
-This repository contains the resources and scripts used to deploy a WordPress website on Amazon Web Services (AWS). The project leverages various AWS services to ensure high availability, scalability, and security for the WordPress application.
+This project demonstrates how to host a WordPress website on AWS by utilizing a robust and scalable architecture. The implementation leverages AWS resources such as VPC, EC2 instances, Load Balancers, Auto Scaling Groups, and managed services for improved reliability, fault tolerance, and scalability.
 
-## Architecture Overview
+## Key Features
 
-The WordPress website is hosted on EC2 instances within a highly available and secure architecture that includes:
+1. **Virtual Private Cloud (VPC):** Configured with public and private subnets across two availability zones to ensure high availability and security.
+2. **Internet Gateway:** Enabled connectivity between the VPC and the Internet.
+3. **Security Groups:** Acted as a firewall to control inbound and outbound traffic.
+4. **Multi-AZ Architecture:** Enhanced fault tolerance by leveraging two Availability Zones.
+5. **Public Subnets:** Deployed infrastructure components like the NAT Gateway and Application Load Balancer.
+6. **Private Subnets:** Hosted web servers for enhanced security.
+7. **NAT Gateway:** Provided instances in private subnets with Internet access.
+8. **EC2 Instances:** Hosted the WordPress website.
+9. **Application Load Balancer:** Distributed traffic evenly to an Auto Scaling Group of EC2 instances.
+10. **Auto Scaling Group:** Managed EC2 instances automatically to ensure scalability and availability.
+11. **Amazon Certificate Manager:** Secured application communications with SSL/TLS certificates.
+12. **Simple Notification Service (SNS):** Alerted about activities in the Auto Scaling Group.
+13. **Amazon Route 53:** Managed the domain name and DNS records.
+14. **Elastic File System (EFS):** Provided shared file storage for web servers.
+15. **Relational Database Service (RDS):** Hosted the WordPress database for improved reliability.
+16. **Version Control:** Stored deployment scripts and configuration files on GitHub for collaboration.
 
-- A Virtual Private Cloud (VPC) with public and private subnets across two Availability Zones (AZs) for fault tolerance and high availability.
-- An Internet Gateway to allow communication between instances in the VPC and the internet.
-- Security Groups acting as a virtual firewall to control inbound and outbound traffic.
-- Public Subnets used for the NAT Gateway and Application Load Balancer, facilitating external access and load balancing.
-- Private Subnets for web servers to enhance security.
-- EC2 Instance Connect Endpoint for secure SSH access.
-- An Application Load Balancer with a target group to distribute incoming web traffic across multiple EC2 instances.
-- An Auto Scaling Group to automatically adjust the number of EC2 instances based on traffic, ensuring scalability and resilience.
-- Amazon RDS for a managed relational database service.
-- Amazon EFS for a scalable, elastic file storage system.
-- AWS Certificate Manager for managing SSL/TLS certificates.
-- AWS Simple Notification Service (SNS) for notifications related to the Auto Scaling Group activities.
-- Amazon Route 53 for domain name registration and DNS management.
+## Project Architecture
 
-## Deployment Scripts
+The following components were configured and deployed:
 
-### WordPress Installation Script
+1. **VPC Configuration:**
+   - Created public and private subnets across two Availability Zones.
+   - Configured routing tables for Internet Gateway and NAT Gateway.
 
-This script is used for the initial setup of the WordPress application on an EC2 instance. It includes steps for installing Apache, PHP, MySQL, and mounting the Amazon EFS to the instance.
+2. **Web Server Deployment:**
+   - Deployed EC2 instances in private subnets.
+   - Installed necessary software, including Apache, PHP, MySQL, and WordPress files.
 
+3. **Load Balancer and Auto Scaling:**
+   - Configured an Application Load Balancer to handle incoming traffic.
+   - Set up an Auto Scaling Group to dynamically adjust the number of EC2 instances.
+
+4. **Database Configuration:**
+   - Used Amazon RDS to host the WordPress database.
+   - Configured secure connectivity between the database and web servers.
+
+5. **Storage:**
+   - Mounted EFS to share files across EC2 instances.
+
+6. **Domain Management:**
+   - Registered a domain using Route 53.
+   - Created DNS records to point the domain to the Load Balancer.
+
+## Deployment Steps
+
+### 1. Configure the EC2 Instance
+
+#### Update Software Packages
 ```bash
-# create to root user
-sudo su
-
-# update the software packages on the ec2 instance 
 sudo yum update -y
+```
 
-# create an html directory 
-sudo mkdir -p /var/www/html
-
-# environment variable
-EFS_DNS_NAME=fs-0865fb2a73d784996.efs.ap-southeast-2.amazonaws.com
-
-# mount the efs to the html directory 
-sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport "$EFS_DNS_NAME":/ /var/www/html
-
-# install the apache web server, enable it to start on boot, and then start the server immediately
+#### Install Apache Web Server
+```bash
 sudo yum install -y httpd
-sudo systemctl enable httpd 
+sudo systemctl enable httpd
 sudo systemctl start httpd
+```
 
-# install php 8 along with several necessary extensions for wordpress to run
+#### Install PHP and Extensions
+```bash
 sudo dnf install -y \
 php \
 php-cli \
@@ -73,117 +89,66 @@ php-fileinfo \
 php-openssl \
 php-pdo \
 php-tokenizer
+```
 
-# install the mysql version 8 community repository
-sudo wget https://dev.mysql.com/get/mysql80-community-release-el9-1.noarch.rpm 
-#
-# install the mysql server
-sudo dnf install -y mysql80-community-release-el9-1.noarch.rpm 
+### 2. Configure MySQL
+
+#### Install MySQL
+```bash
+sudo wget https://dev.mysql.com/get/mysql80-community-release-el9-1.noarch.rpm
+sudo dnf install -y mysql80-community-release-el9-1.noarch.rpm
 sudo rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
-sudo dnf repolist enabled | grep "mysql.*-community.*"
-sudo dnf install -y mysql-community-server 
-#
-# start and enable the mysql server
+sudo dnf install -y mysql-community-server
+```
+
+#### Start MySQL Service
+```bash
 sudo systemctl start mysqld
 sudo systemctl enable mysqld
+```
 
-# set permissions
-sudo usermod -a -G apache ec2-user
-sudo chown -R ec2-user:apache /var/www
-sudo chmod 2775 /var/www && find /var/www -type d -exec sudo chmod 2775 {} \;
-sudo find /var/www -type f -exec sudo chmod 0664 {} \;
-chown apache:apache -R /var/www/html 
+### 3. Configure EFS
 
-# download wordpress files
+#### Mount EFS to HTML Directory
+```bash
+EFS_DNS_NAME=fs-0865fb2a73d784996.efs.ap-southeast-2.amazonaws.com
+sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport "$EFS_DNS_NAME":/ /var/www/html
+```
+
+### 4. Deploy WordPress
+
+#### Download and Configure WordPress
+```bash
 wget https://wordpress.org/latest.tar.gz
 tar -xzf latest.tar.gz
 sudo cp -r wordpress/* /var/www/html/
-
-# create the wp-config.php file
 sudo cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
-
-# edit the wp-config.php file
-sudo vi /var/www/html/wp-config.php
-
-# restart the webserver
-sudo service httpd restart
+sudo chown -R ec2-user:apache /var/www
+sudo chmod 2775 /var/www && find /var/www -type d -exec sudo chmod 2775 {} \;
+sudo find /var/www -type f -exec sudo chmod 0664 {} \;
 ```
 
-### Auto Scaling Group Launch Template Script
-
-This script is included in the launch template for the Auto Scaling Group, ensuring that new instances are configured correctly with the necessary software and settings.
+#### Edit wp-config.php
+Update database credentials in the `wp-config.php` file to connect to the RDS database.
 
 ```bash
-#!/bin/bash
-# update the software packages on the ec2 instance 
-sudo yum update -y
+sudo vi /var/www/html/wp-config.php
+```
 
-# install the apache web server, enable it to start on boot, and then start the server immediately
-sudo yum install -y http
-
-d
-sudo systemctl enable httpd 
-sudo systemctl start httpd
-
-# install php 8 along with several necessary extensions for wordpress to run
-sudo dnf install -y \
-php \
-php-cli \
-php-cgi \
-php-curl \
-php-mbstring \
-php-gd \
-php-mysqlnd \
-php-gettext \
-php-json \
-php-xml \
-php-fpm \
-php-intl \
-php-zip \
-php-bcmath \
-php-ctype \
-php-fileinfo \
-php-openssl \
-php-pdo \
-php-tokenizer
-
-# install the mysql version 8 community repository
-sudo wget https://dev.mysql.com/get/mysql80-community-release-el9-1.noarch.rpm 
-#
-# install the mysql server
-sudo dnf install -y mysql80-community-release-el9-1.noarch.rpm 
-sudo rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
-sudo dnf repolist enabled | grep "mysql.*-community.*"
-sudo dnf install -y mysql-community-server 
-#
-# start and enable the mysql server
-sudo systemctl start mysqld
-sudo systemctl enable mysqld
-
-# environment variable
-EFS_DNS_NAME=fs-02d3268559aa2a318.efs.us-east-1.amazonaws.com
-
-# mount the efs to the html directory 
-echo "$EFS_DNS_NAME:/ /var/www/html nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 0 0" >> /etc/fstab
-mount -a
-
-# set permissions
-chown apache:apache -R /var/www/html
-
-# restart the webserver
+#### Restart Apache Server
+```bash
 sudo service httpd restart
 ```
 
-## How to Use
+## GitHub Repository
 
-1. Clone this repository to your local machine.
-2. Follow the AWS documentation to create the required resources (VPC, subnets, Internet Gateway, etc.) as outlined in the architecture overview.
-3. Use the provided scripts to set up the WordPress application on EC2 instances within the VPC.
-4. Configure the Auto Scaling Group, Load Balancer, and other services as per the architecture.
-5. Access the WordPress website through the Load Balancer's DNS name.
+All deployment scripts, configuration files, and reference diagram are stored in the GitHub repository for this project.
 
-## Contributing
+## Notifications
 
-Contributions to this project are welcome! Please fork the repository and submit a pull request with your enhancements.
+- Enabled SNS (Simple Notification System) for real-time alerts about scaling activities.
 
----
+## Conclusion
+
+This project demonstrates the deployment of a scalable and secure WordPress website on AWS using industry-standard best practices for DevOps and cloud architecture. The implementation ensures high availability, fault tolerance, and performance, making it suitable for production environments.
+
