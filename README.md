@@ -53,8 +53,8 @@ The following components were configured and deployed:
 
 ## Deployment Scripts and Resources
 
-- **WordPress Installation Script:** See `install_wordpress.sh` for the script used to install and configure WordPress.
-- **Auto Scaling Launch Template Script:** The script to be added to the Auto Scaling launch template can be found in `launch_template.sh`.
+- **WordPress Installation Script:** See `Deploy-Script-Wordpress.sh` for the script used to install and configure WordPress.
+- **Auto Scaling Launch Template Script:** The script to be added to the Auto Scaling launch template can be found in `EC2-Launch-Template.sh`.
 
 ## WordPress Installation Script
 
@@ -205,7 +205,7 @@ sudo systemctl restart httpd
 
 ## GitHub Repository
 
-All deployment scripts and the reference diagram are stored in the GitHub repository for this project.
+All deployment scripts, configuration files, and reference diagrams are stored in the GitHub repository for this project.
 
 ## Notifications
 
