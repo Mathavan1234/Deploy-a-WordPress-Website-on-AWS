@@ -51,24 +51,38 @@ The following components were configured and deployed:
    - Registered a domain using Route 53.
    - Created DNS records to point the domain to the Load Balancer.
 
-## Deployment Steps
+## Deployment Scripts and Resources
 
-### 1. Configure the EC2 Instance
+- **WordPress Installation Script:** See `install_wordpress.sh` for the script used to install and configure WordPress.
+- **Auto Scaling Launch Template Script:** The script to be added to the Auto Scaling launch template can be found in `launch_template.sh`.
 
-#### Update Software Packages
+## WordPress Installation Script
+
 ```bash
+#!/bin/bash
+# Switch to root user
+sudo su
+
+# Update the software packages on the EC2 instance
 sudo yum update -y
-```
 
-#### Install Apache Web Server
-```bash
+# Create the web root directory
+sudo mkdir -p /var/www/html
+
+# Set the EFS DNS name (replace with your EFS DNS)
+EFS_DNS_NAME=fs-0865fb2a73d784996.efs.ap-southeast-2.amazonaws.com
+
+# Mount the EFS to the html directory
+sudo mount -t nfs4 -o \
+nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport \
+"$EFS_DNS_NAME":/ /var/www/html
+
+# Install Apache web server
 sudo yum install -y httpd
 sudo systemctl enable httpd
 sudo systemctl start httpd
-```
 
-#### Install PHP and Extensions
-```bash
+# Install PHP 8 and necessary extensions
 sudo dnf install -y \
 php \
 php-cli \
@@ -89,60 +103,109 @@ php-fileinfo \
 php-openssl \
 php-pdo \
 php-tokenizer
-```
 
-### 2. Configure MySQL
-
-#### Install MySQL
-```bash
+# Install MySQL 8 community repository
 sudo wget https://dev.mysql.com/get/mysql80-community-release-el9-1.noarch.rpm
+
+# Install MySQL server
 sudo dnf install -y mysql80-community-release-el9-1.noarch.rpm
 sudo rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
+sudo dnf repolist enabled | grep "mysql.*-community.*"
 sudo dnf install -y mysql-community-server
-```
 
-#### Start MySQL Service
-```bash
+# Start and enable MySQL server
 sudo systemctl start mysqld
 sudo systemctl enable mysqld
-```
 
-### 3. Configure EFS
-
-#### Mount EFS to HTML Directory
-```bash
-EFS_DNS_NAME=fs-0865fb2a73d784996.efs.ap-southeast-2.amazonaws.com
-sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport "$EFS_DNS_NAME":/ /var/www/html
-```
-
-### 4. Deploy WordPress
-
-#### Download and Configure WordPress
-```bash
-wget https://wordpress.org/latest.tar.gz
-tar -xzf latest.tar.gz
-sudo cp -r wordpress/* /var/www/html/
-sudo cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
+# Set permissions
+sudo usermod -a -G apache ec2-user
 sudo chown -R ec2-user:apache /var/www
 sudo chmod 2775 /var/www && find /var/www -type d -exec sudo chmod 2775 {} \;
 sudo find /var/www -type f -exec sudo chmod 0664 {} \;
-```
+sudo chown apache:apache -R /var/www/html
 
-#### Edit wp-config.php
-Update database credentials in the `wp-config.php` file to connect to the RDS database.
+# Download WordPress files
+wget https://wordpress.org/latest.tar.gz
+tar -xzf latest.tar.gz
+sudo cp -r wordpress/* /var/www/html/
 
-```bash
+# Create the wp-config.php file
+sudo cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
+
+# Edit the wp-config.php file with your database credentials
 sudo vi /var/www/html/wp-config.php
+
+# Restart the web server
+sudo systemctl restart httpd
 ```
 
-#### Restart Apache Server
+## Auto Scaling Launch Template Script
+
 ```bash
-sudo service httpd restart
+#!/bin/bash
+# Update the software packages on the EC2 instance
+sudo yum update -y
+
+# Install Apache web server
+sudo yum install -y httpd
+sudo systemctl enable httpd
+sudo systemctl start httpd
+
+# Install PHP 8 and necessary extensions
+sudo dnf install -y \
+php \
+php-cli \
+php-cgi \
+php-curl \
+php-mbstring \
+php-gd \
+php-mysqlnd \
+php-gettext \
+php-json \
+php-xml \
+php-fpm \
+php-intl \
+php-zip \
+php-bcmath \
+php-ctype \
+php-fileinfo \
+php-openssl \
+php-pdo \
+php-tokenizer
+
+# Install MySQL 8 community repository
+sudo wget https://dev.mysql.com/get/mysql80-community-release-el9-1.noarch.rpm
+
+# Install MySQL server
+sudo dnf install -y mysql80-community-release-el9-1.noarch.rpm
+sudo rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
+sudo dnf repolist enabled | grep "mysql.*-community.*"
+sudo dnf install -y mysql-community-server
+
+# Start and enable MySQL server
+sudo systemctl start mysqld
+sudo systemctl enable mysqld
+
+# Set the EFS DNS name (replace with your EFS DNS)
+EFS_DNS_NAME=fs-0865fb2a73d784996.efs.ap-southeast-2.amazonaws.com
+
+# Mount the EFS to the html directory via fstab
+echo "$EFS_DNS_NAME:/ /var/www/html nfs4 \
+nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 0 0" | sudo tee -a /etc/fstab
+
+sudo mount -a
+
+# Set permissions
+sudo chown apache:apache -R /var/www/html
+
+# Restart the web server
+sudo systemctl restart httpd
 ```
+
 
 ## GitHub Repository
 
-All deployment scripts, configuration files, and reference diagram are stored in the GitHub repository for this project.
+All deployment scripts and the reference diagram are stored in the GitHub repository for this project.
 
 ## Notifications
 
