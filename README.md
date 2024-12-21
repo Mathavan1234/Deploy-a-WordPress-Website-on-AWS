@@ -205,7 +205,7 @@ sudo systemctl restart httpd
 
 ## GitHub Repository
 
-All deployment scripts, configuration files, and reference diagrams are stored in the GitHub repository for this project.
+All deployment scripts, configuration files, and the reference diagram are stored in the GitHub repository for this project.
 
 ## Notifications
 
